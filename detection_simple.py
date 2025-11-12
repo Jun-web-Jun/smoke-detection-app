@@ -164,11 +164,18 @@ def save_to_firebase(event_type, details):
 print("[INFO] 감지 시작...")
 print("=" * 50)
 
+# OpenCV 윈도우 생성
+cv2.namedWindow('Smoke Detection', cv2.WINDOW_NORMAL)
+cv2.resizeWindow('Smoke Detection', 640, 480)
+
 try:
     while True:
         # 프레임 캡처
         frame = picam2.capture_array()
         current_time = time.time()
+
+        # 화면 표시용 프레임 복사
+        display_frame = frame.copy()
 
         # 전처리
         input_data = preprocess(frame)
@@ -185,21 +192,44 @@ try:
         smoke_detected = False
         fire_detected = False
 
+        # 감지된 객체에 바운딩 박스 그리기
         for box, score, class_id in zip(boxes, scores, class_ids):
             label = labels[class_id]
+            x, y, w, h = box
 
+            # 바운딩 박스 좌표 계산
+            x1 = int(x)
+            y1 = int(y)
+            x2 = int(x + w)
+            y2 = int(y + h)
+
+            # 클래스별 색상 설정
             if label == "Person":
+                color = (0, 255, 0)  # 초록색
                 person_detected = True
                 person_detections.append(current_time)
             elif label == "Cigarette":
+                color = (0, 0, 255)  # 빨간색
                 cigarette_detected = True
                 cigarette_detections.append(current_time)
             elif label == "Smoke":
+                color = (0, 165, 255)  # 주황색
                 smoke_detected = True
                 smoke_detections.append(current_time)
             elif label == "Fire":
+                color = (0, 0, 255)  # 빨간색
                 fire_detected = True
                 fire_detections.append(current_time)
+            else:
+                color = (255, 255, 255)
+
+            # 바운딩 박스 그리기
+            cv2.rectangle(display_frame, (x1, y1), (x2, y2), color, 2)
+
+            # 레이블과 신뢰도 표시
+            label_text = f"{label}: {score:.2f}"
+            cv2.putText(display_frame, label_text, (x1, y1 - 10),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
         # 감지 상태 출력
         status = []
@@ -214,6 +244,13 @@ try:
 
         if status:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] 감지: {' '.join(status)}")
+
+        # 화면에 상태 표시
+        status_y = 30
+        for status_text in status:
+            cv2.putText(display_frame, status_text, (10, status_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+            status_y += 40
 
         # 음성 안내/경고 판단
         person_sustained = check_detection_duration(person_detections)
@@ -248,6 +285,13 @@ try:
                 play_audio_safe(GUIDE_FILE)
                 last_guide_time = current_time
 
+        # 화면 표시
+        cv2.imshow('Smoke Detection', display_frame)
+
+        # 'q' 키를 누르면 종료
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
         # 잠시 대기
         time.sleep(0.1)
 
@@ -257,4 +301,5 @@ except KeyboardInterrupt:
 finally:
     picam2.stop()
     pygame.mixer.quit()
+    cv2.destroyAllWindows()
     print("[INFO] 정리 완료. 프로그램 종료.")
