@@ -47,3 +47,7 @@ app.*.map.json
 # Windows reserved filenames
 nul
 *.apk
+
+# Firebase credentials (보안)
+firebase-service-account.json
+*firebase-adminsdk*.json
