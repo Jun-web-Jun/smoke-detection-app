@@ -13,7 +13,7 @@ class FirebaseService {
 
   // 컬렉션 참조
   static final CollectionReference _eventsCollection =
-      _firestore.collection('events');
+      _firestore.collection('detection_events');
   static final CollectionReference _devicesCollection =
       _firestore.collection('devices');
 
@@ -23,12 +23,16 @@ class FirebaseService {
     EventStatus? statusFilter,
   }) {
     Query query = _eventsCollection
-        .orderBy('created_at', descending: true)
+        .orderBy('timestamp', descending: true)
         .limit(limit);
 
-    // 상태 필터링
+    // 상태 필터링 (라즈베리파이 데이터는 resolved 필드 사용)
     if (statusFilter != null) {
-      query = query.where('status', isEqualTo: statusFilter.name);
+      if (statusFilter == EventStatus.completed) {
+        query = query.where('resolved', isEqualTo: true);
+      } else {
+        query = query.where('resolved', isEqualTo: false);
+      }
     }
 
     return query.snapshots().map((snapshot) {
@@ -192,50 +196,65 @@ class FirebaseService {
     String id,
     Map<String, dynamic> data,
   ) {
-    final detectedObjects = List<String>.from(data['detected_objects'] ?? []);
+    // 라즈베리파이에서 저장한 데이터 구조
+    // { type: 'smoking', timestamp: ..., details: {...}, resolved: false }
 
-    // 라벨 결정
-    String label = 'person';
-    if (detectedObjects.contains('cigarette')) {
+    final type = data['type'] as String? ?? 'unknown';
+    final details = data['details'] as Map<String, dynamic>? ?? {};
+    final resolved = data['resolved'] as bool? ?? false;
+
+    // 라벨 결정 (type에서 가져옴)
+    String label = 'cigarette'; // 기본값은 cigarette
+    if (type == 'smoking') {
       label = 'cigarette';
-    } else if (detectedObjects.contains('smoke')) {
+    } else if (type == 'person') {
+      label = 'person';
+    }
+
+    // details에서 실제 감지된 객체 확인
+    final person = details['person'] as bool? ?? false;
+    final cigarette = details['cigarette'] as bool? ?? false;
+    final smoke = details['smoke'] as bool? ?? false;
+    final fire = details['fire'] as bool? ?? false;
+
+    // 우선순위: fire > cigarette > smoke > person
+    if (fire) {
+      label = 'fire';
+    } else if (cigarette) {
+      label = 'cigarette';
+    } else if (smoke) {
       label = 'smoke';
-    } else if (detectedObjects.isNotEmpty) {
-      label = detectedObjects.first;
+    } else if (person) {
+      label = 'person';
     }
 
     // 상태 변환
-    EventStatus status = EventStatus.pending;
-    final statusStr = data['status'] as String? ?? 'pending';
-    if (statusStr == 'processing') {
-      status = EventStatus.processing;
-    } else if (statusStr == 'completed') {
-      status = EventStatus.completed;
-    }
+    EventStatus status = resolved ? EventStatus.completed : EventStatus.pending;
 
     // 타임스탬프 처리
-    final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ??
-        (data['created_at'] as Timestamp?)?.toDate() ??
-        DateTime.now();
+    final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
 
-    // 이미지 URL
+    // 이미지 URL (현재는 플레이스홀더)
     final imageUrl = data['image_url'] as String? ??
-        'https://via.placeholder.com/640x480?text=No+Image';
+        'https://via.placeholder.com/640x480/FF6B6B/FFFFFF?text=흡연+감지';
+
+    // 신뢰도 계산 (기본값 0.9)
+    double confidence = 0.9;
 
     return DetectionEvent(
       id: id,
       timestamp: timestamp,
       label: label,
-      confidence: (data['confidence'] as num?)?.toDouble() ?? 0.0,
+      confidence: confidence,
       imageUrl: imageUrl,
       thumbnailUrl: imageUrl,
       metadata: {
-        'camera_id': data['camera_id'],
-        'detected_objects': detectedObjects,
-        'created_at': data['created_at'],
+        'type': type,
+        'details': details,
+        'message': details['message'] ?? '',
       },
       status: status,
-      location: data['location'] as String?,
+      location: data['location'] as String? ?? 'N1동(본부관) 1층 입구',
     );
   }
 
