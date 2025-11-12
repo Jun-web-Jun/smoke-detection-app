@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "670587848151",
+    "project_id": "smoke-detection-system-d85b6",
+    "storage_bucket": "smoke-detection-system-d85b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:670587848151:android:9f946b40f14dddbf46b792",
+        "android_client_info": {
+          "package_name": "com.example.smoke_detection_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDX26mqDF-T3vJm1NtAPAZm69cnoIGJQMI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

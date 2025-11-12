@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>카메라 스트림 테스트</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        h1 {
+            color: #0ff;
+        }
+        img {
+            border: 2px solid #0ff;
+            max-width: 100%;
+            height: auto;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #1a1a1a;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>CCTV 카메라 스트림 테스트</h1>
+
+    <div class="status">
+        <h2>카메라 1 - 본관 1층 입구</h2>
+        <p>스트림 URL: <code>http://localhost:5000/api/camera/1/stream</code></p>
+    </div>
+
+    <img src="http://localhost:5000/api/camera/1/stream" alt="Camera 1 Stream">
+
+    <div class="status">
+        <p>위에 웹캠 화면이 보여야 합니다.</p>
+        <p>만약 이미지가 안 보이면:</p>
+        <ul>
+            <li>카메라 서버가 실행 중인지 확인</li>
+            <li>웹캠이 다른 프로그램에서 사용 중인지 확인</li>
+            <li>브라우저 콘솔(F12)에서 오류 확인</li>
+        </ul>
+    </div>
+</body>
+</html>

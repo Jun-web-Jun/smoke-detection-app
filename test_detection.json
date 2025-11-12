@@ -1,0 +1,7 @@
+{
+  "camera_id": 1,
+  "location": "본관 1층 입구",
+  "detected_objects": ["person", "cigarette"],
+  "confidence": 0.95,
+  "timestamp": "2025-10-24T16:30:00"
+}

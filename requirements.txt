@@ -1,0 +1,11 @@
+# Flask 서버용 패키지
+Flask==3.0.0
+Flask-CORS==4.0.0
+opencv-python==4.8.1.78
+
+# 라즈베리파이 Firebase 클라이언트용 패키지
+firebase-admin==6.2.0
+numpy==1.24.3
+
+# YOLO (선택사항 - 실제 감지 사용 시)
+# ultralytics==8.0.196
