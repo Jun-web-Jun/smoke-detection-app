@@ -10,6 +10,8 @@ import time
 import pygame
 from collections import deque
 from datetime import datetime
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 # ==================== 설정 ====================
 # ONNX 모델 설정
@@ -34,6 +36,9 @@ WARNING_CYCLE = 31    # 경고 전체 주기 (초)
 DETECTION_WINDOW = 10    # 감지 판단 윈도우 (초)
 REQUIRED_DURATION = 3    # 필요한 지속 시간 (초)
 
+# Firebase 설정
+FIREBASE_CREDENTIAL_PATH = "firebase-service-account.json"
+
 # ==================== 전역 변수 ====================
 person_detections = deque(maxlen=DETECTION_WINDOW)
 cigarette_detections = deque(maxlen=DETECTION_WINDOW)
@@ -45,6 +50,18 @@ last_warning_time = 0
 
 # ==================== Pygame 초기화 ====================
 pygame.mixer.init(frequency=44100, buffer=4096)
+
+# ==================== Firebase 초기화 ====================
+print(f"[INFO] Firebase 초기화 중...")
+try:
+    cred = credentials.Certificate(FIREBASE_CREDENTIAL_PATH)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("[INFO] Firebase 연결 완료")
+except Exception as e:
+    print(f"[ERROR] Firebase 초기화 실패: {e}")
+    print("[WARNING] Firebase 없이 계속 진행합니다")
+    db = None
 
 # ==================== ONNX 모델 로드 ====================
 print(f"[INFO] ONNX 모델 로드 중: {ONNX_MODEL_PATH}")
@@ -124,6 +141,25 @@ def check_detection_duration(detections, required_duration=REQUIRED_DURATION):
         return True
     return False
 
+# ==================== Firebase 저장 함수 ====================
+def save_to_firebase(event_type, details):
+    """Firebase에 감지 이벤트 저장"""
+    if db is None:
+        return
+
+    try:
+        event_data = {
+            'type': event_type,  # 'smoking' 또는 'person'
+            'timestamp': firestore.SERVER_TIMESTAMP,
+            'details': details,
+            'resolved': False
+        }
+
+        doc_ref = db.collection('detection_events').add(event_data)
+        print(f"[FIREBASE] 이벤트 저장 완료: {event_type}")
+    except Exception as e:
+        print(f"[ERROR] Firebase 저장 실패: {e}")
+
 # ==================== 메인 루프 ====================
 print("[INFO] 감지 시작...")
 print("=" * 50)
@@ -193,8 +229,15 @@ try:
                 play_audio_safe(WARNING_FILE)
                 last_warning_time = current_time
 
-                # TODO: Firebase에 이벤트 저장
-                # save_to_firebase(...)
+                # Firebase에 이벤트 저장
+                detection_details = {
+                    'person': person_detected,
+                    'cigarette': cigarette_detected,
+                    'smoke': smoke_detected,
+                    'fire': fire_detected,
+                    'message': '흡연 행위가 감지되었습니다'
+                }
+                save_to_firebase('smoking', detection_details)
 
         # 안내 상황 (Person만)
         elif person_sustained and not cigarette_sustained and not smoke_sustained:
