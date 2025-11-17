@@ -11,7 +11,7 @@ import pygame
 from collections import deque
 from datetime import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, storage
 
 # ==================== 설정 ====================
 # ONNX 모델 설정
@@ -55,13 +55,17 @@ pygame.mixer.init(frequency=44100, buffer=4096)
 print(f"[INFO] Firebase 초기화 중...")
 try:
     cred = credentials.Certificate(FIREBASE_CREDENTIAL_PATH)
-    firebase_admin.initialize_app(cred)
+    firebase_admin.initialize_app(cred, {
+        'storageBucket': 'smoke-detection-system-d85b6.appspot.com'
+    })
     db = firestore.client()
+    bucket = storage.bucket()
     print("[INFO] Firebase 연결 완료")
 except Exception as e:
     print(f"[ERROR] Firebase 초기화 실패: {e}")
     print("[WARNING] Firebase 없이 계속 진행합니다")
     db = None
+    bucket = None
 
 # ==================== ONNX 모델 로드 ====================
 print(f"[INFO] ONNX 모델 로드 중: {ONNX_MODEL_PATH}")
@@ -141,21 +145,62 @@ def check_detection_duration(detections, required_duration=REQUIRED_DURATION):
         return True
     return False
 
+# ==================== Firebase 이미지 업로드 함수 ====================
+def upload_image_to_storage(frame, event_id):
+    """Firebase Storage에 이미지 업로드"""
+    if bucket is None:
+        return None
+
+    try:
+        # 프레임을 JPEG로 인코딩
+        _, img_encoded = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        img_bytes = img_encoded.tobytes()
+
+        # Firebase Storage에 업로드
+        blob = bucket.blob(f'detection_images/{event_id}.jpg')
+        blob.upload_from_string(img_bytes, content_type='image/jpeg')
+
+        # Public URL 생성
+        blob.make_public()
+        image_url = blob.public_url
+
+        print(f"[FIREBASE] 이미지 업로드 완료: {event_id}.jpg")
+        return image_url
+    except Exception as e:
+        print(f"[ERROR] 이미지 업로드 실패: {e}")
+        return None
+
 # ==================== Firebase 저장 함수 ====================
-def save_to_firebase(event_type, details):
+def save_to_firebase(event_type, details, frame=None):
     """Firebase에 감지 이벤트 저장"""
     if db is None:
         return
 
     try:
+        # 이벤트 ID 생성
+        doc_ref = db.collection('detection_events').document()
+        event_id = doc_ref.id
+
+        # 이미지 업로드 (있으면)
+        image_url = None
+        if frame is not None:
+            image_url = upload_image_to_storage(frame, event_id)
+
+        # 이벤트 데이터 구성
         event_data = {
             'type': event_type,  # 'smoking' 또는 'person'
             'timestamp': firestore.SERVER_TIMESTAMP,
             'details': details,
-            'resolved': False
+            'resolved': False,
+            'location': 'N1동(본부관) 1층 입구'
         }
 
-        doc_ref = db.collection('detection_events').add(event_data)
+        # 이미지 URL 추가 (있으면)
+        if image_url:
+            event_data['image_url'] = image_url
+
+        # Firestore에 저장
+        doc_ref.set(event_data)
         print(f"[FIREBASE] 이벤트 저장 완료: {event_type}")
     except Exception as e:
         print(f"[ERROR] Firebase 저장 실패: {e}")
@@ -266,7 +311,7 @@ try:
                 play_audio_safe(WARNING_FILE)
                 last_warning_time = current_time
 
-                # Firebase에 이벤트 저장
+                # Firebase에 이벤트 저장 (이미지 포함)
                 detection_details = {
                     'person': person_detected,
                     'cigarette': cigarette_detected,
@@ -274,7 +319,7 @@ try:
                     'fire': fire_detected,
                     'message': '흡연 행위가 감지되었습니다'
                 }
-                save_to_firebase('smoking', detection_details)
+                save_to_firebase('smoking', detection_details, display_frame)
 
         # 안내 상황 (Person만)
         elif person_sustained and not cigarette_sustained and not smoke_sustained:
