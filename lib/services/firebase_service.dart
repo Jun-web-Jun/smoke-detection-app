@@ -50,7 +50,7 @@ class FirebaseService {
   }) async {
     try {
       Query query = _eventsCollection
-          .orderBy('created_at', descending: true)
+          .orderBy('timestamp', descending: true)
           .limit(limit);
 
       if (statusFilter != null) {
