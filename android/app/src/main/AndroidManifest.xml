@@ -56,6 +56,11 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@android:color/holo_red_dark" />
         <!-- Google Maps API Key -->
+        <!-- 보안: API Key는 Google Cloud Console에서 다음 제한을 설정하세요:
+             1. Application restrictions: Android apps
+             2. Package name: com.example.smoke_detection_app
+             3. SHA-1 fingerprint: (debug keystore의 SHA-1)
+             4. API restrictions: Maps SDK for Android만 허용 -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyD9A9-5z2kCVK4SUFXhv14K6jl59lAgSYc"/>
