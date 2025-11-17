@@ -11,7 +11,7 @@ import pygame
 from collections import deque
 from datetime import datetime
 import firebase_admin
-from firebase_admin import credentials, firestore, storage
+from firebase_admin import credentials, firestore, storage, messaging
 
 # ==================== 설정 ====================
 # ONNX 모델 설정
@@ -170,6 +170,41 @@ def upload_image_to_storage(frame, event_id):
         print(f"[ERROR] 이미지 업로드 실패: {e}")
         return None
 
+# ==================== 푸시 알림 전송 함수 ====================
+def send_push_notification(event_type, details, event_id):
+    """FCM을 통해 푸시 알림 전송"""
+    try:
+        # 알림 메시지 구성
+        if event_type == 'smoking':
+            title = '🚨 흡연 감지 알림'
+            body = f"N1동(본부관) 1층 입구에서 흡연 행위가 감지되었습니다"
+        else:
+            title = 'ℹ️ 사람 감지'
+            body = "N1동(본부관) 1층 입구에 사람이 감지되었습니다"
+
+        # FCM 메시지 생성
+        message = messaging.Message(
+            notification=messaging.Notification(
+                title=title,
+                body=body,
+            ),
+            data={
+                'eventId': event_id,
+                'type': event_type,
+                'location': 'N1동(본부관) 1층 입구',
+                'timestamp': datetime.now().isoformat(),
+            },
+            topic='smoking_detection'  # 모든 구독자에게 전송
+        )
+
+        # 메시지 전송
+        response = messaging.send(message)
+        print(f"[FCM] 푸시 알림 전송 완료: {response}")
+        return response
+    except Exception as e:
+        print(f"[ERROR] 푸시 알림 전송 실패: {e}")
+        return None
+
 # ==================== Firebase 저장 함수 ====================
 def save_to_firebase(event_type, details, frame=None):
     """Firebase에 감지 이벤트 저장"""
@@ -202,6 +237,11 @@ def save_to_firebase(event_type, details, frame=None):
         # Firestore에 저장
         doc_ref.set(event_data)
         print(f"[FIREBASE] 이벤트 저장 완료: {event_type}")
+
+        # 푸시 알림 전송 (흡연 감지인 경우만)
+        if event_type == 'smoking':
+            send_push_notification(event_type, details, event_id)
+
     except Exception as e:
         print(f"[ERROR] Firebase 저장 실패: {e}")
 
