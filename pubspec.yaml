@@ -26,8 +26,8 @@ dependencies:
   # 라우팅
   go_router: ^13.0.0
 
-  # MJPEG 스트림 (나중에 실제 스트림 연결 시 사용)
-  # mjpeg: ^1.0.1
+  # MJPEG 스트림
+  flutter_mjpeg: ^2.0.4
 
   # 이미지 캐싱
   cached_network_image: ^3.3.1
