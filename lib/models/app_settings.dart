@@ -15,7 +15,7 @@ class AppSettings {
     this.smokeDetectionEnabled = true,
     this.fireDetectionEnabled = true,
     this.confidenceThreshold = 0.5,
-    this.streamUrl = 'http://localhost:5000/api/camera/1/stream',
+    this.streamUrl = 'http://192.168.0.230:5000/video_feed',
   });
 
   /// JSON에서 AppSettings 객체 생성

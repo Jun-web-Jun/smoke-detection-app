@@ -237,7 +237,7 @@ class SettingsScreen extends ConsumerWidget {
           controller: controller,
           decoration: const InputDecoration(
             labelText: 'MJPEG 스트림 URL',
-            hintText: 'http://localhost:8080/stream',
+            hintText: 'http://192.168.0.230:5000/video_feed',
           ),
           keyboardType: TextInputType.url,
         ),
