@@ -1,0 +1,13 @@
+{
+  "id": "8f423a26-26fd-402c-929d-03cfd1861d77",
+  "camera_id": 1,
+  "location": "본관 1층 입구",
+  "detected_objects": [
+    "person",
+    "cigarette"
+  ],
+  "confidence": 0.95,
+  "timestamp": "2025-10-24T16:30:00",
+  "status": "pending",
+  "created_at": "2025-10-24T16:39:56.037816"
+}
