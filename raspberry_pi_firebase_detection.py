@@ -30,7 +30,7 @@ def initialize_firebase():
     """Firebase Admin SDK를 초기화합니다."""
     try:
         # Firebase 서비스 계정 키 파일 경로
-        cred = credentials.Certificate('serviceAccountKey.json')
+        cred = credentials.Certificate('firebase-service-account.json')
 
         # Firebase 초기화 (Storage bucket 이름 지정)
         firebase_admin.initialize_app(cred, {
