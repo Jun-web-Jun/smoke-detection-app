@@ -421,32 +421,43 @@ def send_push_notification(event_type, details, event_id, image_url=None):
         return None
 
 # ==================== Firebase 저장 함수 (비동기 처리) ====================
-def save_to_firebase(event_type, details, frame=None):
-    """Firebase에 감지 이벤트 저장"""
+def save_to_firebase(event_type, details, frame=None, confidence=0.85):
+    """Firebase에 감지 이벤트 저장 (Flutter 앱 호환)"""
     if db is None:
         return
 
     try:
-        doc_ref = db.collection('detection_events').document()
-        event_id = doc_ref.id
+        from datetime import datetime
+        import uuid
 
+        # Flutter 앱과 호환되는 이벤트 ID 생성
+        event_id = str(uuid.uuid4())
+
+        # Firebase Storage에 이미지 업로드
         image_url = None
         if frame is not None:
             image_url = upload_image_to_storage(frame, event_id)
 
+        # Flutter DetectionEvent 모델과 호환되는 데이터 구조
         event_data = {
-            'type': event_type,
-            'timestamp': firestore.SERVER_TIMESTAMP,
-            'details': details,
-            'resolved': False,
-            'location': 'N1동(본부관) 1층 입구'
+            'id': event_id,  # ✅ Flutter 필수 필드
+            'timestamp': datetime.now().isoformat(),  # ✅ ISO 8601 형식
+            'label': 'cigarette' if event_type == 'smoking' else 'person',  # ✅ Flutter 필수 필드
+            'confidence': float(confidence),  # ✅ Flutter 필수 필드
+            'imageUrl': image_url if image_url else '',  # ✅ camelCase로 변경
+            'thumbnailUrl': image_url if image_url else '',  # ✅ Flutter 필수 필드
+            'location': 'N1동(본부관) 1층 입구',  # ✅ Flutter 선택 필드
+            'metadata': {  # ✅ Flutter 필수 필드
+                'source': 'raspberry_pi',
+                'model': 'yolov8_onnx',
+                'cameraId': 'camera_1',
+                'details': details
+            }
         }
 
-        if image_url:
-            event_data['image_url'] = image_url
-
-        doc_ref.set(event_data)
-        print(f"[FIREBASE] 이벤트 저장 완료: {event_type}")
+        # Firestore에 문서 ID를 event_id로 지정하여 저장
+        db.collection('detection_events').document(event_id).set(event_data)
+        print(f"[FIREBASE] ✅ 이벤트 저장 완료 (Flutter 호환): {event_type} (ID: {event_id})")
 
         # 흡연 감지 시에만 푸시 알림 전송
         if event_type == 'smoking':
@@ -536,10 +547,10 @@ def main_detection_loop():
             person_sustained = check_detection_duration(person_detections)
             cigarette_sustained = check_detection_duration(cigarette_detections)
             smoke_sustained = check_detection_duration(smoke_detections)
-            
+
             # 흡연 감지 (사람 + 담배 또는 연기)
             if person_sustained and (cigarette_sustained or smoke_sustained):
-                
+
                 # 4-1. 음성 경고 (주기 체크)
                 if current_time - last_warning_time >= WARNING_CYCLE:
                     print("=" * 50)
@@ -549,10 +560,15 @@ def main_detection_loop():
                     last_warning_time = current_time
 
                     # 4-2. 🚨 Firebase 저장 및 알림 (비동기 스레드) 🚨
+                    # 최대 신뢰도 계산 (담배 또는 연기 중 가장 높은 값)
+                    max_confidence = 0.0
+                    if len(scores) > 0:
+                        max_confidence = max(scores)
+
                     detection_details = {'message': '흡연 행위가 감지되었습니다'}
                     save_thread = threading.Thread(
-                        target=save_to_firebase, 
-                        args=('smoking', detection_details, display_frame.copy()), 
+                        target=save_to_firebase,
+                        args=('smoking', detection_details, display_frame.copy(), max_confidence),
                         daemon=True
                     )
                     save_thread.start()
