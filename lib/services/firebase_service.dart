@@ -196,9 +196,29 @@ class FirebaseService {
     String id,
     Map<String, dynamic> data,
   ) {
-    // 라즈베리파이에서 저장한 데이터 구조
-    // { type: 'smoking', timestamp: ..., details: {...}, resolved: false }
+    // ✅ 신규 형식 (1test11.py 수정 후) 우선 체크
+    // { id: '...', label: 'cigarette', imageUrl: '...', thumbnailUrl: '...', confidence: 0.85, ... }
+    if (data.containsKey('label') && data.containsKey('imageUrl')) {
+      // 신규 형식: 라즈베리파이가 Flutter 호환 형식으로 저장
+      final timestamp = data['timestamp'] is String
+          ? DateTime.parse(data['timestamp'] as String)
+          : (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
 
+      return DetectionEvent(
+        id: data['id'] as String? ?? id,
+        timestamp: timestamp,
+        label: data['label'] as String,
+        confidence: (data['confidence'] as num?)?.toDouble() ?? 0.85,
+        imageUrl: data['imageUrl'] as String,
+        thumbnailUrl: data['thumbnailUrl'] as String,
+        metadata: data['metadata'] as Map<String, dynamic>? ?? {},
+        location: data['location'] as String?,
+        status: null, // 신규 형식에는 status 없음
+      );
+    }
+
+    // ❌ 구 형식 (기존 데이터 호환성 유지)
+    // { type: 'smoking', timestamp: ..., details: {...}, resolved: false, image_url: '...' }
     final type = data['type'] as String? ?? 'unknown';
     final details = data['details'] as Map<String, dynamic>? ?? {};
     final resolved = data['resolved'] as bool? ?? false;
@@ -234,7 +254,7 @@ class FirebaseService {
     // 타임스탬프 처리
     final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
 
-    // 이미지 URL (현재는 플레이스홀더)
+    // 이미지 URL (구 형식은 image_url 필드 사용)
     final imageUrl = data['image_url'] as String? ??
         'https://via.placeholder.com/640x480/FF6B6B/FFFFFF?text=흡연+감지';
 
