@@ -357,34 +357,67 @@ def check_detection_duration(detections, required_duration=REQUIRED_DURATION):
         return True
     return False
 
-# ==================== Firebase 이미지 업로드 함수 ====================
+# ==================== Google Drive 이미지 업로드 함수 ====================
 def upload_image_to_storage(frame, event_id):
-    """OpenCV 프레임을 JPEG로 인코딩하여 Firebase Storage에 업로드"""
-    if bucket is None:
+    """OpenCV 프레임을 JPEG로 인코딩하여 Google Drive에 업로드하고 공개 URL 반환"""
+    global drive_service, photo_folder_id
+
+    if drive_service is None or photo_folder_id is None:
+        print("[WARNING] Google Drive 서비스가 준비되지 않아 이미지 업로드를 건너뜁니다.")
         return None
 
     try:
-        # BGR 이미지를 JPEG로 인코딩 (Picamera2는 RGB를 출력하지만, OpenCV 함수 사용)
+        # 1. 이미지를 임시 파일로 저장
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        temp_filename = f"detection_{timestamp_str}_{event_id}.jpg"
+
+        # RGB to BGR 변환 (OpenCV imwrite는 BGR 사용)
         is_success, buffer = cv2.imencode(".jpg", frame)
         if not is_success:
             print("[ERROR] 이미지 인코딩 실패")
             return None
 
-        image_bytes = buffer.tobytes()
-        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        blob_path = f"detection_images/{timestamp_str}_{event_id}.jpg"
-        
-        blob = bucket.blob(blob_path)
-        blob.upload_from_string(image_bytes, content_type='image/jpeg')
+        # 임시 파일로 저장
+        with open(temp_filename, 'wb') as f:
+            f.write(buffer.tobytes())
 
-        blob.make_public()
-        image_url = blob.public_url
+        # 2. Google Drive에 업로드
+        mimetype = 'image/jpeg'
+        media = MediaFileUpload(temp_filename, mimetype=mimetype)
+        file_metadata = {
+            'name': temp_filename,
+            'parents': [photo_folder_id]
+        }
 
-        print(f"[FIREBASE] 이미지 업로드 완료: {image_url}")
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
+
+        file_id = file.get('id')
+
+        # 3. 파일을 공개로 설정
+        drive_service.permissions().create(
+            fileId=file_id,
+            body={'type': 'anyone', 'role': 'reader'}
+        ).execute()
+
+        # 4. 공개 URL 생성 (직접 이미지 보기 URL)
+        image_url = f"https://drive.google.com/uc?export=view&id={file_id}"
+
+        print(f"[GOOGLE DRIVE] 이미지 업로드 완료: {image_url}")
+
+        # 5. 임시 파일 삭제
+        os.remove(temp_filename)
+
         return image_url
-        
+
     except Exception as e:
-        print(f"[ERROR] Firebase Storage 이미지 업로드 실패: {e}")
+        print(f"[ERROR] Google Drive 이미지 업로드 실패: {e}")
+        # 임시 파일이 남아있다면 삭제
+        if os.path.exists(temp_filename):
+            os.remove(temp_filename)
         return None
 
 # ==================== 푸시 알림 전송 함수 ====================
